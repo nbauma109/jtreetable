@@ -15,6 +15,8 @@
 import javax.swing.event.EventListenerList;
 import javax.swing.event.TreeModelEvent;
 import javax.swing.event.TreeModelListener;
+import javax.swing.tree.MutableTreeNode;
+import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
  
 /**
@@ -64,6 +66,124 @@ public abstract class AbstractTreeTableModel implements TreeTableModel {
         listenerList.remove(TreeModelListener.class, l);
     }
 
+    /**
+     * Invoked this to insert newChild at location index in parents children.
+     * This will then message nodesWereInserted to create the appropriate
+     * event. This is the preferred way to add children as it will create
+     * the appropriate event.
+     */
+    public void insertNodeInto(MutableTreeNode newChild,
+                               MutableTreeNode parent, int index){
+        parent.insert(newChild, index);
+
+        int[]           newIndexs = new int[1];
+
+        newIndexs[0] = index;
+        nodesWereInserted(parent, newIndexs);
+    }
+    
+    /**
+     * Invoke this method after you've inserted some TreeNodes into
+     * node.  childIndices should be the index of the new elements and
+     * must be sorted in ascending order.
+     */
+   public void nodesWereInserted(TreeNode node, int[] childIndices) {
+       if(listenerList != null && node != null && childIndices != null
+          && childIndices.length > 0) {
+           int               cCount = childIndices.length;
+           Object[]          newChildren = new Object[cCount];
+
+           for(int counter = 0; counter < cCount; counter++)
+               newChildren[counter] = node.getChildAt(childIndices[counter]);
+           fireTreeNodesInserted(this, getPathToRoot(node), childIndices,
+                                 newChildren);
+       }
+   }
+   /**
+    * Builds the parents of node up to and including the root node,
+    * where the original node is the last element in the returned array.
+    * The length of the returned array gives the node's depth in the
+    * tree.
+    *
+    * @param aNode the TreeNode to get the path for
+    */
+   public TreeNode[] getPathToRoot(TreeNode aNode) {
+       return getPathToRoot(aNode, 0);
+   }
+
+   /**
+    * Builds the parents of node up to and including the root node,
+    * where the original node is the last element in the returned array.
+    * The length of the returned array gives the node's depth in the
+    * tree.
+    *
+    * @param aNode  the TreeNode to get the path for
+    * @param depth  an int giving the number of steps already taken towards
+    *        the root (on recursive calls), used to size the returned array
+    * @return an array of TreeNodes giving the path from the root to the
+    *         specified node
+    */
+   protected TreeNode[] getPathToRoot(TreeNode aNode, int depth) {
+       TreeNode[]              retNodes;
+       // This method recurses, traversing towards the root in order
+       // size the array. On the way back, it fills in the nodes,
+       // starting from the root and working back to the original node.
+
+       /* Check for null, in case someone passed in a null node, or
+          they passed in an element that isn't rooted at root. */
+       if(aNode == null) {
+           if(depth == 0)
+               return null;
+           else
+               retNodes = new TreeNode[depth];
+       }
+       else {
+           depth++;
+           if(aNode == root)
+               retNodes = new TreeNode[depth];
+           else
+               retNodes = getPathToRoot(aNode.getParent(), depth);
+           retNodes[retNodes.length - depth] = aNode;
+       }
+       return retNodes;
+   }
+   
+   /**
+    * Message this to remove node from its parent. This will message
+    * nodesWereRemoved to create the appropriate event. This is the
+    * preferred way to remove a node as it handles the event creation
+    * for you.
+    */
+   public void removeNodeFromParent(MutableTreeNode node) {
+       MutableTreeNode         parent = (MutableTreeNode)node.getParent();
+
+       if(parent == null)
+           throw new IllegalArgumentException("node does not have a parent.");
+
+       int[]            childIndex = new int[1];
+       Object[]         removedArray = new Object[1];
+
+       childIndex[0] = parent.getIndex(node);
+       parent.remove(childIndex[0]);
+       removedArray[0] = node;
+       nodesWereRemoved(parent, childIndex, removedArray);
+   }
+   
+   /**
+    * Invoke this method after you've removed some TreeNodes from
+    * node.  childIndices should be the index of the removed elements and
+    * must be sorted in ascending order. And removedChildren should be
+    * the array of the children objects that were removed.
+    */
+  public void nodesWereRemoved(TreeNode node, int[] childIndices,
+                               Object[] removedChildren) {
+      if(node != null && childIndices != null) {
+          fireTreeNodesRemoved(this, getPathToRoot(node), childIndices,
+                               removedChildren);
+      }
+  }
+
+   
     /*
      * Notify all listeners that have registered interest for
      * notification on this event type.  The event instance 
